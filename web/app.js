@@ -396,7 +396,7 @@ function openLead(key) {
         <a class="${d.reviews_link ? '' : 'off'}" target="_blank" rel="noopener" href="${esc(safeUrl(d.reviews_link))}"><span class="e">⭐</span>Avaliações</a>
       </div></div>
       <div class="sec"><h5>🧾 Diagnóstico gratuito ${l.diag?.ai ? '<span style="color:var(--good)">personalizado pelo Claude</span>' : ''}</h5>
-        ${l.diag?.url ? `<div class="wabox"><a href="${esc(l.diag.url)}" target="_blank" rel="noopener" style="color:#bfffd6;word-break:break-all">${esc(l.diag.url)}</a>${l.diag.sent ? `<br>📤 enviado ${esc(fmtTs(l.diag.sent))}` : ''}${l.diag.state === 'gerando' ? '<br>⏳ Claude montando…' : l.diag.state === 'erro' ? '<br>⚠ deu erro na última tentativa' : ''}</div>` : '<div class="sub">A página é criada em alguns segundos.</div>'}
+        ${l.diag?.url ? `<div class="wabox"><a href="${esc(l.diag.url)}" target="_blank" rel="noopener" style="color:var(--good-t);word-break:break-all">${esc(l.diag.url)}</a>${l.diag.sent ? `<br>📤 enviado ${esc(fmtTs(l.diag.sent))}` : ''}${l.diag.state === 'gerando' ? '<br>⏳ Claude montando…' : l.diag.state === 'erro' ? '<br>⚠ deu erro na última tentativa' : ''}</div>` : '<div class="sub">A página é criada em alguns segundos.</div>'}
         <div class="row"><button class="btn" id="dgCopy" ${l.diag?.url ? '' : 'disabled'}>Copiar link</button><button class="btn ai" id="dgGen" ${l.diag?.state === 'gerando' ? 'disabled' : ''}>🧠 Personalizar com Claude</button>${(i.wa || i.tel) && S.wa?.state === 'conectado' ? '<button class="btn gold" id="dgSend">📤 Gerar e mandar no WhatsApp</button>' : ''}</div></div>
       <div class="sec"><h5>Meu cliente?</h5><button class="btn cli ${l.client ? 'on' : ''}" id="cliBtn">${l.client ? '✓ É meu cliente (ver na Blindagem)' : '🛡 Marcar como meu cliente'}</button></div>
       <div class="sec"><h5>Funil</h5><div class="pipesel" id="pipesel">${Object.entries(PIPE).map(([k, [n, c]]) => `<button data-p="${k}" style="--c:${c}" class="${l.pipeline === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>
@@ -566,6 +566,7 @@ function connect() {
     renderProgress(); renderHunts();
   });
   es.addEventListener('support', () => setTimeout(showSupport, 2500));
+  es.addEventListener('update', e => { S.upd = JSON.parse(e.data); paintUpd(); });
   es.addEventListener('feed', e => feedLine(JSON.parse(e.data)));
   es.addEventListener('sweep', e => {
     const sw = JSON.parse(e.data), prev = S.sweeps.get(sw.id); S.sweeps.set(sw.id, sw);
@@ -690,7 +691,7 @@ function renderShield() {
   const cnt = k => cl.filter(l => shieldOf(l.intel.score)[0] === k).length;
   const gaps = cl.reduce((a, l) => a + l.intel.why.filter(w => w.k === 'opp').length, 0);
   $('#skpis').innerHTML = [['Clientes', cl.length, ''], ['🚨 Expostos', cnt('exposto'), 'var(--hot)'], ['⚠ Atenção', cnt('atencao'), 'var(--warm)'], ['✓ Blindados', cnt('blindado'), 'var(--good)'], ['Brechas abertas', gaps, 'var(--gold)']]
-    .map(([a, b, c]) => `<div class="sk"><small>${a}</small><b style="color:${c || '#fff'}">${b}</b></div>`).join('');
+    .map(([a, b, c]) => `<div class="sk"><small>${a}</small><b style="color:${c || 'var(--ink)'}">${b}</b></div>`).join('');
   // candidatos de uma busca por nome que não bateu
   const fh = S.findHunt && S.hunts.get(S.findHunt);
   const cands = fh && !S.findOk ? [...S.leads.values()].filter(l => inHunt(l, fh.id) && !l.client) : [];
@@ -717,7 +718,7 @@ function renderShield() {
         ${rk ? `<div class="stat"><span>No bairro</span><b>#${rk.pos} de ${rk.n}</b></div>` : ''}
         <div class="stat"><span>Checagens</span><b>${h.length}${z ? ' · ' + esc(z.ts.slice(8, 10) + '/' + z.ts.slice(5, 7)) : ''}</b></div>
         ${spark(h, 'reviews', 'var(--cyan)')}
-        ${rk && rk.pos > 1 ? `<div class="sub" style="margin-top:6px">Líder no bairro: <b style="color:#fff">${esc(rk.top.data.title)}</b> (★ ${rk.top.intel.rating.toFixed(1)}, ${fmt(rk.top.intel.reviews)})</div>` : ''}
+        ${rk && rk.pos > 1 ? `<div class="sub" style="margin-top:6px">Líder no bairro: <b style="color:var(--ink)">${esc(rk.top.data.title)}</b> (★ ${rk.top.intel.rating.toFixed(1)}, ${fmt(rk.top.intel.reviews)})</div>` : ''}
       </div></div>
       <div class="bot"><button class="btn" data-recheck="${esc(l.key)}">↻ Re-checar</button><button class="btn" data-open="${esc(l.key)}">Abrir ficha</button>
         <button class="btn ai" data-plan="${esc(l.key)}">🧠 Plano de blindagem</button><button class="btn" data-uncli="${esc(l.key)}" style="margin-left:auto">Remover</button></div></article>`;
@@ -974,3 +975,51 @@ async function showSupport() {
   };
 }
 $('#coffee').onclick = showSupport;
+
+
+/* ───────── tema claro/escuro ───────── */
+$('#themeBtn').onclick = () => {
+  const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', next);
+  try { localStorage.setItem('garimpo_theme', next); } catch (e) {}
+};
+
+
+/* ───────── atualização pelo painel (git pull + instalador + reinício) ───────── */
+function paintUpd() {
+  const u = S.upd, b = $('#updBtn'); if (!b || !u) return;
+  b.hidden = !(u.git && u.behind > 0) && !u.busy;
+  b.title = u.behind ? `Versão nova disponível (${u.behind} ${u.behind > 1 ? 'mudanças' : 'mudança'})` : '';
+  const box = $('#updStep'); if (box) box.textContent = u.error || u.step || '';
+  if (u.error && $('#updGo')) { $('#updGo').disabled = false; $('#updGo').textContent = 'Tentar de novo'; }
+}
+function showUpdate() {
+  const u = S.upd; if (!u) return;
+  const m = $('#modal');
+  m.innerHTML = `<div class="box"><div style="width:100%"><h2>⬆ Atualização disponível</h2>
+    <p>Você está na versão <b>${esc(u.local || '?')}</b>${u.date ? ' (' + esc(u.date) + ')' : ''}. O que há de novo:</p>
+    <ul class="terms" data-noi18n>${(u.changes || []).map(c => `<li>${esc(c)}</li>`).join('') || '<li>…</li>'}</ul>
+    ${u.dirty ? '<p style="color:var(--hot)">Você alterou arquivos do Garimpo. Atualize pelo terminal: <code>git pull</code></p>' : '<p style="opacity:.75;font-size:12.5px">O Garimpo baixa a versão nova, confere os componentes e reinicia sozinho. Seus leads e configurações ficam como estão. Se o WhatsApp estiver conectado, ele reconecta em instantes.</p>'}
+    <div id="updStep" style="min-height:20px;font-size:13px;color:var(--gold)"></div>
+    <div class="row"><button class="btn" id="updLater" type="button">Depois</button>
+      <button class="btn gold" id="updGo" type="button" ${u.dirty ? 'disabled' : ''}>Atualizar agora</button></div></div></div>`;
+  m.classList.add('on');
+  $('#updLater').onclick = () => m.classList.remove('on');
+  $('#updGo').onclick = async () => {
+    $('#updGo').disabled = true; $('#updLater').disabled = true; $('#updStep').textContent = 'Baixando a versão nova…';
+    try { await api('POST', '/api/update/apply'); } catch (er) { $('#updStep').textContent = er.message; $('#updGo').disabled = false; $('#updLater').disabled = false; return; }
+    let down = false; const before = u.local, t0 = Date.now();
+    for (let i = 0; i < 300; i++) {
+      await new Promise(r => setTimeout(r, 1500));
+      try {
+        const r = await fetch('/api/update'); if (!r.ok) throw 0;
+        const j = await r.json();
+        if (j.error) { $('#updStep').textContent = j.error; $('#updLater').disabled = false; $('#updGo').disabled = false; $('#updGo').textContent = 'Tentar de novo'; return; }
+        if (down || (j.local && j.local !== before) || (Date.now() - t0 > 25000 && !j.busy)) { location.reload(); return; }
+      } catch (e) { down = true; $('#updStep').textContent = 'Reiniciando o Garimpo…'; }
+    }
+    $('#updStep').textContent = 'Demorou mais que o normal. Recarregue a página ou rode ./garimpo start.';
+  };
+}
+$('#updBtn').onclick = showUpdate;
+api('GET', '/api/update?check=1').then(u => { S.upd = u; paintUpd(); }).catch(() => {});

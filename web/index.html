@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="app.css">
 </head>
+<script>try{var t=localStorage.getItem("garimpo_theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
 <body>
 <div class="app" id="app">
   <header>
@@ -39,6 +40,9 @@
       <select class="select-hunt" id="huntSel" title="Filtrar por caçada"></select>
       <span class="pill" title="Motor de raspagem"><i class="dot" id="engDot"></i><span id="engTxt">motor…</span></span>
       <span class="pill" title="Claude CLI para análises"><i class="dot" id="aiDot"></i>claude</span>
+      <button class="btn-ghost" id="updBtn" hidden style="color:var(--gold);border-color:var(--gold)">⬆ Atualizar</button>
+      <button class="btn-ghost" id="langBtn" data-noi18n title="Switch to English">EN</button>
+      <button class="btn-ghost" id="themeBtn" title="Tema claro/escuro">◐</button>
       <button class="btn-ghost" id="coffee" title="Gostou? Me pague um café">☕</button>
       <button class="btn-ghost" id="sound" title="Som ao achar lead quente">🔊</button>
       <a class="btn-ghost" id="export" href="/api/export.csv">⬇ CSV</a>
@@ -52,7 +56,7 @@
       <div class="field">
         <label>O que caçar</label>
         <div class="box" id="kwBox"><input id="kwIn" placeholder="ex: hamburgueria  ↵"></div>
-        <div class="sugs" id="sugs"></div>
+        <div class="sugs" id="sugs" data-noi18n></div>
       </div>
       <div class="field ac">
         <label>Onde</label>
@@ -218,5 +222,6 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="app.js"></script>
+<script src="i18n.js"></script>
 </body>
 </html>

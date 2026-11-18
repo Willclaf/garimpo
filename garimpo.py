@@ -975,6 +975,79 @@ def start_hunt(kws, city, lat, lon, depth, opts, jobs):
     return hr, None
 
 
+# ───────────────────────── Atualização pelo painel ─────────────────────────
+# Funciona quando o Garimpo foi instalado com `git clone`. Confere o GitHub, mostra o que mudou e, no clique, faz
+# `git pull --ff-only`, roda o instalador (que só baixa o que mudou, sempre conferindo hash) e reinicia o servidor.
+UPDATE = {"git": False, "checked": 0.0, "behind": 0, "changes": [], "local": "", "date": "", "dirty": False, "error": "", "busy": False, "step": ""}
+UPDATE_LOCK = threading.Lock()
+
+
+def _git(*args, timeout=30):
+    r = subprocess.run(["git", "-C", ROOT] + list(args), capture_output=True, text=True, timeout=timeout)
+    return r.returncode, (r.stdout or "").strip(), (r.stderr or "").strip()
+
+
+def update_check():
+    if not os.path.isdir(os.path.join(ROOT, ".git")) or not shutil.which("git"):
+        UPDATE.update(git=False, checked=time.time(), behind=0, changes=[], error="")
+        return
+    try:
+        UPDATE["git"] = True
+        rc, out, err = _git("fetch", "--quiet", "origin", "main", timeout=40)
+        if rc != 0:
+            UPDATE.update(error="não consegui falar com o GitHub", checked=time.time())
+            return
+        UPDATE["local"] = _git("rev-parse", "--short", "HEAD")[1]
+        UPDATE["date"] = _git("log", "-1", "--format=%cs")[1]
+        UPDATE["dirty"] = bool(_git("status", "--porcelain", "--untracked-files=no")[1])
+        behind = _git("rev-list", "--count", "HEAD..origin/main")[1]
+        UPDATE["behind"] = int(behind) if behind.isdigit() else 0
+        UPDATE["changes"] = [x for x in _git("log", "--format=%s", "-n", "10", "HEAD..origin/main")[1].splitlines() if x]
+        UPDATE.update(error="", checked=time.time())
+    except Exception as e:  # noqa: BLE001
+        UPDATE.update(error=f"falha ao conferir: {e}"[:160], checked=time.time())
+    finally:
+        emit("update", update_public())
+
+
+def update_public():
+    return {k: UPDATE[k] for k in ("git", "behind", "changes", "local", "date", "dirty", "error", "busy", "step")}
+
+
+def update_watch():
+    time.sleep(4)
+    while True:
+        update_check()
+        time.sleep(6 * 3600)
+
+
+def update_apply():
+    """git pull + instalador + reinício. Roda numa thread; o painel acompanha pelo evento 'update'."""
+    if not UPDATE_LOCK.acquire(blocking=False):
+        return
+    try:
+        UPDATE.update(busy=True, error="", step="Baixando a versão nova…")
+        emit("update", update_public())
+        rc, _, err = _git("merge", "--ff-only", "origin/main", timeout=60)
+        if rc != 0:
+            raise RuntimeError("não deu para atualizar sozinho (" + (err or "conflito")[:120] + "). Atualize pelo terminal: git pull")
+        UPDATE["step"] = "Conferindo os componentes (instalador)…"
+        emit("update", update_public())
+        r = subprocess.run([sys.executable, "-I", os.path.join(ROOT, "install.py")], cwd=ROOT, capture_output=True, text=True, timeout=900)
+        if r.returncode != 0:
+            raise RuntimeError("o instalador falhou: " + ((r.stdout or "") + (r.stderr or ""))[-200:].strip())
+        UPDATE["step"] = "Reiniciando o Garimpo…"
+        emit("update", update_public())
+        env = dict(os.environ, GARIMPO_OPEN="0")
+        script = f'sleep 1; kill {os.getpid()}; sleep 2; cd "{ROOT}"; nohup "{sys.executable}" garimpo.py >> data/garimpo.log 2>&1 &'
+        subprocess.Popen(["sh", "-c", script], env=env, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception as e:  # noqa: BLE001
+        UPDATE.update(busy=False, step="", error=str(e)[:300])
+        emit("update", update_public())
+    finally:
+        UPDATE_LOCK.release()
+
+
 # ───────────────────────── WhatsApp (Evolution API) ─────────────────────────
 SETTINGS_PATH = os.path.join(ROOT, "data", "settings.json")
 WA_DEFAULTS = {"typing": True, "provider": "gowa", "gowa_port": int(os.environ.get("GARIMPO_GOWA_PORT", "3010")), "gowa_user": "garimpo", "gowa_pass": "", "gowa_secret": "",
@@ -1959,6 +2032,10 @@ class H(BaseHTTPRequestHandler):
             sweeps = [sweep_out(r) for r in q("SELECT * FROM sweeps ORDER BY hunt_id, idx")]
             return self.send(200, {"hunts": hunts, "leads": leads, "sweeps": sweeps, "engine": engine_alive(),
                                    "claude": bool(CLAUDE and os.path.exists(CLAUDE)), "pipeline": PIPELINE})
+        if p == "/api/update":
+            if qs.get("check") and time.time() - UPDATE["checked"] > 60 and not UPDATE["busy"]:
+                update_check()
+            return self.send(200, update_public())
         if p == "/api/support":
             return self.send(200, {k: SUPPORT[k] for k in ("nome", "chave", "copia")})
         if p == "/api/cities":
@@ -2198,6 +2275,15 @@ class H(BaseHTTPRequestHandler):
                 emit("reload", {})
             emit("wa", wa_public())
             return self.send(200, wa_public())
+        if p == "/api/update/apply":
+            if not UPDATE["git"] or UPDATE["behind"] < 1:
+                return self.send(409, {"error": "não há atualização disponível (ou o Garimpo não foi instalado com git clone)"})
+            if UPDATE["dirty"]:
+                return self.send(409, {"error": "você alterou arquivos do Garimpo. Atualize pelo terminal: git pull"})
+            if UPDATE["busy"]:
+                return self.send(409, {"error": "já está atualizando"})
+            threading.Thread(target=update_apply, daemon=True).start()
+            return self.send(200, {"ok": True})
         if p == "/api/terms":
             if b.get("accept") is True:
                 cfg = wa_settings()
@@ -2342,6 +2428,7 @@ def main():
     threading.Thread(target=gowa_watch, daemon=True).start()
     threading.Thread(target=engine_watch, daemon=True).start()
     threading.Thread(target=ensure_engine, daemon=True).start()
+    threading.Thread(target=update_watch, daemon=True).start()
     if os.environ.get("GARIMPO_OPEN") == "1":
         threading.Timer(1.5, lambda: webbrowser.open(f"http://localhost:{PORT}")).start()
     srv = QuietServer(("127.0.0.1", PORT), H)

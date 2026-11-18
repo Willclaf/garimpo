@@ -22,6 +22,10 @@ cliente, e conversa com eles pelo WhatsApp. Tudo num painel que roda no seu comp
   WhatsApp restringir o número.
 - **Diagnóstico gratuito por lead:** uma página bonita, para celular, com a nota de presença digital, comparação com a
   concorrência e plano de ação. Quem responde "EU QUERO" recebe o link sozinho.
+- **Tema claro e escuro** (botão ◐) e **interface em português ou inglês** (botão EN/PT no topo). As mensagens de
+  prospecção e as páginas de diagnóstico continuam em português, porque são para o público brasileiro.
+- **Atualização pelo painel:** quando sai versão nova, aparece o botão **⬆ Atualizar**. Um clique baixa, confere os
+  componentes e reinicia o Garimpo, sem perder leads nem configurações.
 - **IA opcional:** com o [Claude Code](https://www.anthropic.com/claude-code) instalado, o Garimpo analisa cada lead e
   personaliza o diagnóstico. Sem ele, o resto funciona igual.
 
@@ -52,6 +56,12 @@ Depois ele abre o painel em **http://localhost:7777**. No macOS, também dá par
 4. Monte a primeira caçada à esquerda e clique em **Iniciar varredura**.
 
 Para parar: `./garimpo stop`. Para abrir de novo: `./garimpo start`.
+
+### Atualizar
+
+Se você instalou com `git clone`, o botão **⬆ Atualizar** aparece no topo do painel quando há versão nova (ele confere o
+GitHub ao abrir e a cada 6 horas). Pelo terminal dá no mesmo: `git pull && ./garimpo install`. Se você alterou arquivos do
+Garimpo, o botão não atualiza sozinho (para não sobrescrever o seu trabalho): use o `git pull`.
 
 ## Como usar o WhatsApp com cuidado
 
@@ -113,6 +123,7 @@ Quase tudo se configura no painel. Variáveis de ambiente opcionais:
 
 ## Limitações
 
+- A interface tem versão em inglês, mas as mensagens para os leads e os diagnósticos são em português (Brasil).
 - Mensagens e regras de números pensadas para o **Brasil, em português**. Celulares brasileiros têm duas grafias
   (com e sem o 9 depois do DDD): o Garimpo escolhe sozinho (DDD 31 ou maior fica sem o 9, ou usa a conversa que já
   existe), mas isso foi validado apenas em alguns DDDs.
@@ -150,7 +161,8 @@ talks to them over WhatsApp, in a live dashboard that runs on your own machine (
 `./install.sh` downloads and hash-verifies the third-party pieces (the Google Maps engine by
 [@Mahanaicoach](https://github.com/Mahanaicoach) and the WhatsApp gateway by
 [@aldinokemal](https://github.com/aldinokemal), built on [whatsmeow](https://github.com/tulir/whatsmeow)), then opens the
-panel and asks you to scan the WhatsApp QR code.
+panel and asks you to scan the WhatsApp QR code. The panel has a light/dark theme, an English/Portuguese switch (EN/PT
+button) and a one-click **⬆ Update** button for `git clone` installs.
 
 **Warning:** the WhatsApp connection is **unofficial**. Your number can be restricted or banned, and the authors are not
 responsible. Prefer the official WhatsApp Business Platform. Read [DISCLAIMER.md](DISCLAIMER.md). The UI and message
