@@ -565,6 +565,7 @@ function connect() {
     if (prev && prev.status === 'rodando' && h.status === 'pronta') { boom(); toast(`✔ Caçada #${h.id} concluída`); fitMap(true); }
     renderProgress(); renderHunts();
   });
+  es.addEventListener('support', () => setTimeout(showSupport, 2500));
   es.addEventListener('feed', e => feedLine(JSON.parse(e.data)));
   es.addEventListener('sweep', e => {
     const sw = JSON.parse(e.data), prev = S.sweeps.get(sw.id); S.sweeps.set(sw.id, sw);
@@ -950,3 +951,24 @@ function onboard() {
   if (!w.terms_ok) return showTerms();
   if (w.provider === 'gowa' && w.gowa && w.gowa.installed && !['conectado', 'conectando'].includes(w.state)) { setView('wa'); setTimeout(() => $('#gwConnect').click(), 500); }
 }
+
+
+/* ───────── apoio ao autor (opcional): ☕ no topo, e um convite na 1ª caçada e a cada 50 ───────── */
+async function showSupport() {
+  let d; try { d = await api('GET', '/api/support'); } catch (e) { return; }
+  const m = $('#modal');
+  m.innerHTML = `<div class="box" style="text-align:center"><div style="font-size:42px">☕</div><h2>Gostou do Garimpo?</h2>
+    <p>Ele é grátis e vai continuar grátis. Se te ajudou a achar clientes, um Pix de qualquer valor me ajuda a manter e melhorar. Se quiser me pagar um café, sou muito grato. 💚</p>
+    <div style="margin:14px 0;padding:12px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--line2);word-break:break-all;font-size:12.5px">
+      <div style="opacity:.7;margin-bottom:4px">Chave Pix (${esc(d.nome)})</div><b id="pixKey">${esc(d.chave)}</b></div>
+    <div class="row"><button class="btn" id="pixLater" type="button">Agora não</button>
+      <button class="btn gold" id="pixCopy" type="button">Copiar Pix Copia e Cola</button></div></div>`;
+  m.classList.add('on');
+  $('#pixLater').onclick = () => m.classList.remove('on');
+  $('#pixCopy').onclick = async () => {
+    try { await navigator.clipboard.writeText(d.copia); }
+    catch (e) { const t = document.createElement('textarea'); t.value = d.copia; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); }
+    $('#pixCopy').textContent = '✓ Copiado! Cole no app do banco'; toast('Pix copiado. Valeu demais! 💚');
+  };
+}
+$('#coffee').onclick = showSupport;

@@ -827,6 +827,8 @@ def poll_hunt(h):
     opts = json.loads(h["opts"] or "{}")
     if st == "pronta" and opts.get("find"):
         match_client(hid, opts["find"], opts.get("cat", ""))
+    if st == "pronta" and not opts.get("kind") and support_bump():
+        emit("support", {"runs": int(wa_settings().get("support_runs", 0))})
     if st == "pronta":
         feed(hid, f"✔ {'Checagem' if opts.get('kind') else 'Caçada'} concluída · {leads['c']} lugares · {leads['hot'] or 0} quentes", "done")
     elif st == "erro":
@@ -980,6 +982,19 @@ WA_DEFAULTS = {"typing": True, "provider": "gowa", "gowa_port": int(os.environ.g
                "max_gap": 300, "start": "09:00", "end": "18:00", "days": [0, 1, 2, 3, 4, 5]}
 WA = {"state": "desconfigurado", "version": "", "next_at": 0.0, "last_sync": "", "error": "", "alert": None, "device": ""}
 TERMS_VERSION = "1"
+# Apoio ao autor (opcional): aparece na 1ª caçada concluída e depois a cada 50. Troque pelos seus dados se fizer um fork.
+SUPPORT = {"nome": "Willian Claf", "chave": "c6a0d335-775a-4a2e-bb7a-2dfbf3f2cb67",
+           "copia": "00020126580014br.gov.bcb.pix0136c6a0d335-775a-4a2e-bb7a-2dfbf3f2cb675204000053039865802BR5912WILLIAN CLAF6014SANTA CATARINA62070503***6304C34D",
+           "every": 50}
+
+
+def support_bump():
+    """Conta uma rodada concluída; devolve True quando é hora de lembrar do café (1ª e depois a cada 50)."""
+    cfg = wa_settings()
+    n = int(cfg.get("support_runs", 0)) + 1
+    cfg["support_runs"] = n
+    wa_save(cfg)
+    return n == 1 or n % SUPPORT["every"] == 0
 
 
 def terms_ok():
@@ -1944,6 +1959,8 @@ class H(BaseHTTPRequestHandler):
             sweeps = [sweep_out(r) for r in q("SELECT * FROM sweeps ORDER BY hunt_id, idx")]
             return self.send(200, {"hunts": hunts, "leads": leads, "sweeps": sweeps, "engine": engine_alive(),
                                    "claude": bool(CLAUDE and os.path.exists(CLAUDE)), "pipeline": PIPELINE})
+        if p == "/api/support":
+            return self.send(200, {k: SUPPORT[k] for k in ("nome", "chave", "copia")})
         if p == "/api/cities":
             try:
                 return self.send(200, engine_req("GET", "/api/v1/cities?q=" + urllib.parse.quote(qs.get("q", [""])[0])))

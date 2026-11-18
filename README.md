@@ -125,6 +125,16 @@ Quase tudo se configura no painel. Variáveis de ambiente opcionais:
 Issues e pull requests são bem-vindos. Antes de abrir um PR, rode `python3 -m py_compile garimpo.py diag.py install.py`
 e confira que nada de dado pessoal foi parar no código.
 
+## Apoie ☕
+
+O Garimpo é grátis e vai continuar assim. Ele mostra um convite discreto na primeira caçada concluída e depois a cada 50
+(o botão ☕ no topo do painel abre o mesmo convite quando você quiser). Se ele te ajudou, um Pix de qualquer valor ajuda
+a manter e melhorar:
+
+**Chave Pix:** `c6a0d335-775a-4a2e-bb7a-2dfbf3f2cb67` (Willian Claf)
+
+Se fizer um fork, troque os dados em `SUPPORT` no `garimpo.py`.
+
 ## Licença e créditos
 
 [MIT](LICENSE). O Garimpo usa o trabalho de muita gente: veja os [créditos](CREDITS.md).
