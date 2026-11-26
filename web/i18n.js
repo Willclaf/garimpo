@@ -158,11 +158,15 @@
     '⌀ Sem site': '⌀ No website', '◎ Score médio': '◎ Average score', '◎ Score': '◎ Score',
     'Foco opcional (ex: vendo tráfego pago, vendo site…)': 'Optional focus (e.g. I sell paid traffic, I sell websites…)', 'Falei com o dono, retorno sexta…': 'Talked to the owner, following up Friday…', 'https://evolution.seudominio.com.br': 'https://evolution.yourdomain.com',
     'pausado': 'paused', 'parada': 'stopped', 'pausados': 'paused', 'enviado': 'sent', 'respondeu': 'replied', 'cancelado': 'cancelled', 'pulado': 'skipped', 'pulados': 'skipped', 'gerando': 'generating', 'agora': 'now', 'checagem': 'check', 'cliente': 'client', 'atencao': 'warning',
+    'inverter': 'invert', 'Inverte a seleção dos bairros mostrados': 'Inverts the selection of the neighborhoods shown', '▭ no mapa': '▭ on map', 'Dica: Shift + clique marca uma faixa de bairros. No mapa, arraste um retângulo para marcar vários.': 'Tip: Shift + click selects a range of neighborhoods. On the map, drag a rectangle to select several.',
+    'Arraste no mapa para marcar vários bairros de uma vez. Segure Alt ao soltar para desmarcar. (Atalho: Shift + arrastar)': 'Drag on the map to select several neighborhoods at once. Hold Alt when releasing to deselect. (Shortcut: Shift + drag)', 'Arraste no mapa para marcar vários bairros (Alt ao soltar = desmarcar)': 'Drag on the map to select several neighborhoods (Alt on release = deselect)',
+    'BUSCANDO BAIRROS…': 'LOOKING UP NEIGHBORHOODS…', '⌛ Procurando a cidade…': '⌛ Looking for the city…',
     'Próprio': 'Own', 'próprio': 'own', 'nenhum': 'none', 'rede social': 'social network', 'plataforma': 'platform'
   };
 
   /* Padrões com números e nomes. Cada item: [regex que casa o texto inteiro, resposta com $1, $2…] */
   const R = [
+    [/^(\d+) bairros? (marcados?|desmarcados?)$/, function (m) { return m[1] + ' neighborhood' + (m[1] > 1 ? 's' : '') + ' ' + (m[2].indexOf('des') === 0 ? 'deselected' : 'selected'); }],
     [/^(\d+) no total$/, '$1 in total'],
     [/^Versão nova disponível \((\d+) mudanças?\)$/, 'New version available ($1 change(s))'], [/^Você está na versão$/, 'You are on version'], [/^(\(.+\))?\. O que há de novo:$/, '$1. What is new:'],
     [/^📤 você mandou (.+)$/, '📤 you sent it $1'], [/^🔗 você mandou (.+)$/, '🔗 you sent it $1'],

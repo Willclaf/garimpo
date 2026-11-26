@@ -521,16 +521,30 @@ $('#cityIn').onkeydown = e => {
   if (e.key === 'ArrowUp') { acI = Math.max(0, acI - 1); drawAc(); e.preventDefault(); }
   if (e.key === 'Enter') { e.preventDefault(); pickCity(acItems[Math.max(0, acI)]); }
 };
-$('#cityIn').onblur = () => setTimeout(() => $('#acList').hidden = true, 150);
-function pickCity(c) { if (!c) return; S.city = c; $('#cityIn').value = c.label; $('#acList').hidden = true; map.flyTo([+c.lat, +c.lon], 12, { duration: 1.2 }); if (S.mode === 'bairros') loadBairros(); }
+$('#cityIn').onblur = () => setTimeout(() => { $('#acList').hidden = true; if (S.mode === 'bairros' && !S.city) ensureCity(); }, 200);
+function pickCity(c) { if (!c) return Promise.resolve(); S.city = c; $('#cityIn').value = c.label; $('#acList').hidden = true; map.flyTo([+c.lat, +c.lon], 12, { duration: 1.2 }); return S.mode === 'bairros' ? loadBairros() : Promise.resolve(); }
+/* Quem digita a cidade e não clica na sugestão também precisa funcionar: pega a primeira sugestão sozinho. */
+async function ensureCity() {
+  if (S.city) return;
+  const v = $('#cityIn').value.trim(); if (v.length < 2) return;
+  let c = acItems[0];
+  if (!c || !(c.label || '').toLowerCase().startsWith(v.toLowerCase().split(',')[0].trim().slice(0, 3))) {
+    try { c = (await api('GET', '/api/cities?q=' + encodeURIComponent(v)))[0]; } catch (e) { c = null; }
+  }
+  if (c) await pickCity(c);
+}
 $('#huntForm').onsubmit = async e => {
   e.preventDefault();
   if ($('#kwIn').value.trim()) addKw($('#kwIn').value);
   if (!S.kw.length) { toast('Diga o que caçar (ex: dentista)'); $('#kwIn').focus(); return; }
-  if (!S.city && $('#cityIn').value.trim()) {
-    try { const r = await api('GET', '/api/cities?q=' + encodeURIComponent($('#cityIn').value.trim())); if (r[0]) pickCity(r[0]); } catch (e) {}
+  const goBtn = $('#goBtn'); if (S.mode === 'bairros' && (!S.city || S.bairrosFor !== S.city.label)) { goBtn.disabled = true; goBtn.textContent = 'BUSCANDO BAIRROS…'; }
+  try { await ensureCity(); if (S.mode === 'bairros' && S.city) await loadBairros(); } finally { goBtn.disabled = false; goBtn.textContent = 'INICIAR VARREDURA'; }
+  if (S.mode === 'bairros') {
+    if (!S.city) { toast('Escolha a cidade acima primeiro.'); $('#cityIn').focus(); return; }
+    await loadBairros();
+    if (!S.bairros.length) { toast('Não achei bairros para essa cidade. Use “Cidade inteira”.'); return; }
+    if (!S.bsel.size) { toast('Escolha pelo menos um bairro'); return; }
   }
-  if (S.mode === 'bairros' && !S.bsel.size) { toast('Escolha pelo menos um bairro'); return; }
   const btn = $('#goBtn'); btn.disabled = true; btn.textContent = 'LIGANDO RADAR…';
   try {
     const h = await api('POST', '/api/hunts', { keywords: S.kw, city: S.city?.label || $('#cityIn').value.trim(), lat: S.city?.lat, lon: S.city?.lon,
@@ -614,17 +628,22 @@ function autoContact(key) {
 }
 $$('#modeSeg button').forEach(b => b.onclick = () => {
   S.mode = b.dataset.m; $$('#modeSeg button').forEach(x => x.classList.toggle('on', x === b));
+  if (S.mode !== 'bairros' && S.boxMode) $('#bBox').click();
   $('#bpick').hidden = S.mode !== 'bairros'; $('#depthLbl').textContent = S.mode === 'bairros' ? 'Alcance por bairro' : 'Alcance por termo';
   if (S.mode === 'bairros') { if (!$('#depth').dataset.touched) $('#depth').value = 1; depthOut(); loadBairros(); } else { renderZones(); }
 });
 $('#depth').addEventListener('input', () => $('#depth').dataset.touched = 1);
-async function loadBairros() {
+function loadBairros() {
+  if (S.bLoad && S.bLoadFor === (S.city && S.city.label)) return S.bLoad;
+  S.bLoadFor = S.city && S.city.label; S.bLoad = loadBairros_(); return S.bLoad;
+}
+async function loadBairros_() {
   const c = S.city;
-  if (!c) { $('#blist').innerHTML = '<div class="bload">Escolha a cidade acima primeiro.</div>'; $('#bfoot').innerHTML = ''; return; }
+  if (!c) { const typed = $('#cityIn').value.trim(); $('#blist').innerHTML = '<div class="bload">' + (typed.length >= 2 ? '⌛ Procurando a cidade…' : 'Escolha a cidade acima primeiro.') + '</div>'; $('#bfoot').innerHTML = ''; if (typed.length >= 2) ensureCity(); return; }
   if (S.bairrosFor === c.label) { drawBairros(); return; }
   $('#blist').innerHTML = '<div class="bload">⌛ Buscando os bairros de ' + esc(c.label.split(',')[0]) + ' no OpenStreetMap…</div>';
   try { S.bairros = await api('GET', `/api/bairros?city=${encodeURIComponent(c.label)}&lat=${c.lat}&lon=${c.lon}`); S.bairrosFor = c.label; }
-  catch (e) { $('#blist').innerHTML = '<div class="bload">Não consegui os bairros: ' + esc(e.message) + '</div>'; return; }
+  catch (e) { S.bLoad = null; $('#blist').innerHTML = '<div class="bload">Não consegui os bairros: ' + esc(e.message) + '</div>'; return; }
   S.bsel = new Set(S.bairros.map(b => b.name)); drawBairros();
   if (S.bairros.length) map.flyToBounds(S.bairros.map(b => [b.lat, b.lon]), { padding: [40, 40], duration: 1.2 });
 }
@@ -636,7 +655,43 @@ function drawBairros() {
   $('#bfoot').innerHTML = `<span><b>${n}</b> de ${S.bairros.length} bairros</span><span>até ~${fmt(n * kw * d * 20)} lugares · ~${mins} min</span>`;
   renderZones();
 }
-$('#blist').onchange = e => { const b = e.target.dataset.b; if (!b) return; e.target.checked ? S.bsel.add(b) : S.bsel.delete(b); drawBairros(); };
+$('#blist').onchange = e => { const b = e.target.dataset.b; if (!b) return; e.target.checked ? S.bsel.add(b) : S.bsel.delete(b); S.bLast = b; drawBairros(); };
+/* Shift + clique: marca ou desmarca a faixa inteira entre o último clicado e este */
+$('#blist').addEventListener('click', e => {
+  const lab = e.target.closest('label'); if (!lab || !e.shiftKey || !S.bLast) return;
+  const input = lab.querySelector('input'), b = input && input.dataset.b; if (!b) return;
+  const q = S.bq.toLowerCase(), names = S.bairros.filter(x => !q || x.name.toLowerCase().includes(q)).map(x => x.name);
+  const i = names.indexOf(S.bLast), j = names.indexOf(b); if (i < 0 || j < 0) return;
+  e.preventDefault();
+  const on = !S.bsel.has(b);
+  names.slice(Math.min(i, j), Math.max(i, j) + 1).forEach(n => on ? S.bsel.add(n) : S.bsel.delete(n));
+  S.bLast = b; drawBairros();
+});
+$('#bInv').onclick = () => { const q = S.bq.toLowerCase(); S.bairros.filter(b => !q || b.name.toLowerCase().includes(q)).forEach(b => S.bsel.has(b.name) ? S.bsel.delete(b.name) : S.bsel.add(b.name)); drawBairros(); };
+/* Retângulo no mapa: marca (ou, com Alt, desmarca) todos os bairros dentro dele. Shift + arrastar também funciona. */
+map.boxZoom.disable();
+let boxStart = null, boxRect = null;
+function boxOn() { return S.mode === 'bairros' && S.bairros.length; }
+$('#bBox').onclick = () => {
+  S.boxMode = !S.boxMode; $('#bBox').classList.toggle('on', S.boxMode); map.getContainer().classList.toggle('boxsel', S.boxMode);
+  S.boxMode ? map.dragging.disable() : map.dragging.enable();
+  if (S.boxMode) toast('Arraste no mapa para marcar vários bairros (Alt ao soltar = desmarcar)');
+};
+map.on('mousedown', e => {
+  if (!boxOn() || !(S.boxMode || e.originalEvent.shiftKey)) return;
+  map.dragging.disable(); boxStart = e.latlng; boxRect = L.rectangle(L.latLngBounds(boxStart, boxStart), { color: '#ffcf4a', weight: 1.5, fillOpacity: .12, interactive: false }).addTo(map);
+});
+map.on('mousemove', e => { if (boxStart && boxRect) boxRect.setBounds(L.latLngBounds(boxStart, e.latlng)); });
+map.on('mouseup', e => {
+  if (!boxStart) return;
+  const b = L.latLngBounds(boxStart, e.latlng), remove = e.originalEvent.altKey; boxStart = null;
+  if (boxRect) { map.removeLayer(boxRect); boxRect = null; }
+  if (!S.boxMode) map.dragging.enable();
+  const inside = S.bairros.filter(x => b.contains([x.lat, x.lon]));
+  if (!inside.length) return;
+  inside.forEach(x => remove ? S.bsel.delete(x.name) : S.bsel.add(x.name));
+  drawBairros(); toast(`${inside.length} bairro${inside.length > 1 ? 's' : ''} ${remove ? 'desmarcado' : 'marcado'}${inside.length > 1 ? 's' : ''}`);
+});
 $('#bq').oninput = e => { S.bq = e.target.value; drawBairros(); };
 $('#bAll').onclick = () => { S.bairros.filter(b => !S.bq || b.name.toLowerCase().includes(S.bq.toLowerCase())).forEach(b => S.bsel.add(b.name)); drawBairros(); };
 $('#bNone').onclick = () => { S.bairros.filter(b => !S.bq || b.name.toLowerCase().includes(S.bq.toLowerCase())).forEach(b => S.bsel.delete(b.name)); drawBairros(); };
